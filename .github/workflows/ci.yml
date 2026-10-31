@@ -1,11 +1,13 @@
-# The self-test on every push and pull request: Node 22, ffmpeg and Chrome are present, and QA fails a
-# file built to fail on exactly the checks it should. Ubuntu's runner has Google Chrome.
+# The self-test, on every push and pull request or by hand from the Actions tab: Node 22, ffmpeg and
+# Chrome are present, and QA fails a file built to fail on exactly the checks it should. Ubuntu's runner
+# has Google Chrome.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
