@@ -1,0 +1,135 @@
+<!doctype html>
+<!-- one-take source composition. build.mjs fills the {{…}} tokens and the FONTS and TAKE placeholders
+     per format × language, and times every <section data-scene> from take.json. Scenes are top-level
+     sections; never nest them. The two placeholder tokens are not written out in this comment on purpose:
+     build.mjs replaces only the first match in the file.
+     Size everything in design px (--u = 1% of the short side) and let .f-<shape> re-lay out each format. -->
+<html lang="{{LANG}}" class="f-{{FORMAT}} f-{{SHAPE}}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width={{W}}, height={{H}}" />
+    <script src="assets/vendor/gsap.min.js"></script>
+    <script src="assets/vendor/take.js"></script>
+    <style>
+      /*FONTS*/
+      :root {
+        --W: {{DW}}px; --H: {{DH}}px; --u: {{U}}px;
+        --safe-t: {{SAFE_T}}px; --safe-b: {{SAFE_B}}px; --safe-l: {{SAFE_L}}px; --safe-r: {{SAFE_R}}px;
+        /* type scale in short-side units: nothing meant to be read goes below --t-min (3.4u) */
+        --t-hero: calc(var(--u) * 12); --t-head: calc(var(--u) * 8); --t-body: calc(var(--u) * 4.6);
+        --t-cap: calc(var(--u) * 3.8); --t-min: calc(var(--u) * 3.4);
+        --ink: #f3f1ec; --paper: #0d0d0f; --accent: #ff5a36; --dim: rgba(243, 241, 236, .62);
+        --f-display: system-ui, sans-serif; --f-text: system-ui, sans-serif;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: {{W}}px; height: {{H}}px; overflow: hidden; background: var(--paper); color: var(--ink); font-family: var(--f-text); -webkit-font-smoothing: antialiased; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; }
+      #stage { position: absolute; left: 0; top: 0; width: var(--W); height: var(--H); transform: scale({{K}}); transform-origin: 0 0; overflow: hidden; }
+      .scene { position: absolute; inset: 0; overflow: hidden; background: var(--paper); }
+      .cam { position: absolute; inset: 0; transform-origin: 50% 50%; }
+      /* the readable area: inside the platform's UI bands */
+      .safe { position: absolute; top: var(--safe-t); bottom: var(--safe-b); left: var(--safe-l); right: var(--safe-r); display: flex; flex-direction: column; justify-content: center; }
+      .w { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: .08em; margin-bottom: -.08em; }
+      .w > i { display: inline-block; font-style: normal; }
+      .swap { position: relative; display: inline-block; min-width: 1px; height: 1.2em; }
+      .swap-v { position: absolute; left: 0; top: 0; white-space: nowrap; }
+      .kicker { font: 700 var(--t-cap)/1.1 var(--f-text); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+      .head { font: 800 var(--t-head)/.98 var(--f-display); letter-spacing: -.03em; }
+      .body { font: 500 var(--t-body)/1.25 var(--f-text); color: var(--dim); max-width: 22em; }
+
+      /* hook */
+      #hook .safe { padding: 0 calc(var(--u) * 2); gap: calc(var(--u) * 3); }
+      /* proof */
+      #proof .num { font: 800 calc(var(--u) * 26)/.9 var(--f-display); letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+      #proof .safe { padding: 0 calc(var(--u) * 2); gap: calc(var(--u) * 2); }
+      /* end card */
+      #end .safe { align-items: center; text-align: center; gap: calc(var(--u) * 3); }
+      #end .name { font: 800 var(--t-hero)/.95 var(--f-display); letter-spacing: -.04em; }
+      #end .url { font: 700 var(--t-cap)/1 var(--f-text); letter-spacing: .16em; text-transform: uppercase; color: var(--dim); }
+
+      /* per-format re-layout, not just a scale */
+      .f-wide #hook .safe, .f-wide #proof .safe { padding-left: calc(var(--u) * 8); }
+      .f-wide #proof .num { font-size: calc(var(--u) * 34); }
+      .f-tall #hook .head { font-size: calc(var(--u) * 10); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="{{DUR}}" data-width="{{W}}" data-height="{{H}}">
+      <div id="stage">
+
+        <section id="hook" class="clip scene" data-scene="hook">
+          <div class="cam" id="hook-cam">
+            <div class="safe">
+              <div class="kicker" id="hook-k"></div>
+              <h1 class="head" id="hook-h"></h1>
+            </div>
+          </div>
+        </section>
+
+        <section id="proof" class="clip scene" data-scene="proof">
+          <div class="cam" id="proof-cam">
+            <div class="safe">
+              <div class="num" id="proof-n">0</div>
+              <p class="body" id="proof-b"></p>
+            </div>
+          </div>
+        </section>
+
+        <section id="end" class="clip scene" data-scene="end">
+          <div class="cam" id="end-cam">
+            <div class="safe">
+              <div class="name" id="end-name"></div>
+              <div class="url" id="end-url"></div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+      <audio id="score" src="assets/audio/score.wav" data-start="0" data-duration="{{DUR}}" data-volume="1" data-timeline-role="music" data-track-index="20"></audio>
+    </div>
+
+    <script>
+      window.TAKE = /*TAKE*/null;
+      const T = Take.init();
+      const C = T.copy, F = T.facts;
+
+      T.scene('hook', (s) => {
+        T.$('#hook-k').textContent = C.hookKicker;
+        T.split('#hook-h', C.hookHead);
+        T.cue('stab', s.t(0));
+        T.enter('#hook-k', s.t(0.1), { from: 'left', cue: false });
+        T.rise('#hook-h', s.beat(1));
+        T.drift('#hook-cam', s.t(0), s.end, { scale: 1.04 });
+        // clear the words before the hand-off, so no text sits under the next scene's reveal
+        T.sink('#hook-h', s.end - 0.3);
+        T.leave('#hook-k', s.end - 0.3, {});
+      });
+
+      T.scene('proof', (s) => {
+        if (s.prev) T.iris('#proof', s.t(0), { inCam: '#proof-cam', x: 30, y: 40, d: 0.9 });
+        T.$('#proof-b').textContent = C.proofBody;
+        // no fallback number: T.count throws when facts.json has no commit count (run scripts/facts.mjs first)
+        T.count('#proof-n', s.beat(2), F.total && F.total.commits, { d: T.bar * 1.25 });
+        T.enter('#proof-b', s.bar(1.5), {});
+        T.drift('#proof-cam', s.t(1.2), s.end, { scale: 1.03 });
+      });
+
+      T.scene('end', (s) => {
+        if (s.prev) T.wipe('#end', s.t(0), { dir: 'up' });
+        T.split('#end-name', C.endName);
+        T.$('#end-url').textContent = C.endUrl;
+        T.rise('#end-name', s.t(0.35), { cue: 'each', each: 'pop' });
+        T.enter('#end-url', s.beat(1.5), { from: 'up' });
+        // complete by beat 2.5; take.json gives the end scene enough bars to hold it 3 s+
+        T.endCard(s.beat(2.5));
+        T.cue('end', s.beat(2.5), { s: 1 });
+        T.drift('#end-cam', s.t(0), s.end, { scale: 1.025 });
+      });
+
+      T.grain({ opacity: 0.06 });
+      T.vignette({ strength: 0.35 });
+      // T.done() registers the timeline once, after every tween above is added. This line repeats it where a reader looks for it.
+      window.__timelines["main"] = T.done();
+    </script>
+  </body>
+</html>

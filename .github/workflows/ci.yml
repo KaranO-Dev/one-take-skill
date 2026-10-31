@@ -1,0 +1,27 @@
+# The self-test on every push and pull request: Node 22, ffmpeg and Chrome are present, and QA fails a
+# file built to fail on exactly the checks it should. Ubuntu's runner has Google Chrome.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Install ffmpeg
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      - name: Self-test
+        run: node scripts/selftest.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
